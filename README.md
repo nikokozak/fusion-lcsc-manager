@@ -31,18 +31,29 @@ A KiCad plugin that allows you to search and import electronic components from L
 
 ### Method 1: Install via Custom Repository (Easiest)
 
-1. Open KiCad PCB Editor
-2. Go to **Tools → Plugin and Content Manager**
-3. Click **Manage** (bottom-left)
-4. Click **Add Repository**
-5. Enter the following URL:
+1. Open the **Plugin and Content Manager**:
+   - From the **main KiCad window** (the project launcher), click the
+     **Plugin and Content Manager** button/icon, **or**
+   - From an editor, go to **Tools → Plugin and Content Manager**
+
+   > **macOS note:** If you don't see it under the *Tools* menu, look on the
+   > main KiCad launcher window instead — on some builds the entry only lives
+   > there (toward the bottom of the window), not inside the PCB/Schematic
+   > editors.
+2. Click **Manage...** (bottom-left)
+3. Click **Add Repository**, paste this URL, and click **OK**:
    ```
    https://raw.githubusercontent.com/hulryung/kicad-lcsc-manager/main/repository.json
    ```
-6. Click **OK** and close the repository manager
-7. Search for **"LCSC Manager"** in the PCM
-8. Click **Install**
-9. Restart KiCad
+4. Close the repository manager, then switch the **repository dropdown**
+   (top of the PCM) to **LCSC Manager** so the plugin appears in the list
+5. Select **LCSC Manager** and click **Install**
+6. Click **Apply Pending Changes** (bottom-right) — this is what actually
+   downloads and installs the plugin
+7. **Quit and restart KiCad completely.** If the plugin still doesn't load
+   (the Install button hangs, or no icon appears), reboot your machine — on
+   macOS a stale KiCad/Python state can block the first load until a full
+   restart.
 
 ### Method 2: Manual Installation
 
@@ -102,6 +113,13 @@ A KiCad plugin that allows you to search and import electronic components from L
 *Import components from LCSC/EasyEDA with real-time stock and pricing information*
 
 ## 🚀 Usage
+
+> **Where the plugin lives:** LCSC Manager runs in the **PCB Editor**
+> (pcbnew), not the Schematic Editor. KiCad's Python action-plugin API is
+> only available in the PCB Editor, so **Search and Import** appears there —
+> launch it from the PCB Editor even if you start your design in the
+> schematic. Imported symbols are still added to your project's symbol
+> library and become available in the Schematic Editor.
 
 ### Quick Start
 

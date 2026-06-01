@@ -80,6 +80,13 @@ class LCSCAPIError(Exception):
     pass
 
 
+class LCSCRateLimitError(LCSCAPIError):
+    """Raised when EasyEDA/JLCPCB throttles us (HTTP 403/429) and retries are
+    exhausted. A subclass of LCSCAPIError so existing handlers still catch it,
+    but distinct so the UI can say "wait and retry" instead of "not found"."""
+    pass
+
+
 class LCSCAPIClient:
     """Client for interacting with LCSC/EasyEDA APIs"""
 
@@ -230,14 +237,24 @@ class LCSCAPIClient:
             return response.json()
 
         except requests.exceptions.HTTPError as e:
-            # Retry on 403 Forbidden (rate limiting)
-            if e.response.status_code == 403 and retry_count < 3:
-                wait_time = self.RETRY_DELAY * (retry_count + 1)  # Exponential backoff
-                logger.warning(f"Got 403 Forbidden, waiting {wait_time}s before retry {retry_count + 1}/3")
-                if session:
-                    session.close()
-                time.sleep(wait_time)
-                return self._make_request(method, url, params, json_data, timeout, retry_count + 1)
+            status = e.response.status_code if e.response is not None else None
+            # EasyEDA throttles with 403 Forbidden (and, per HTTP, 429).
+            # Back off and retry before giving up.
+            if status in (403, 429):
+                if retry_count < 3:
+                    wait_time = self.RETRY_DELAY * (retry_count + 1)  # Exponential backoff
+                    logger.warning(
+                        f"Got HTTP {status} (rate limited), waiting {wait_time}s "
+                        f"before retry {retry_count + 1}/3"
+                    )
+                    if session:
+                        session.close()
+                    time.sleep(wait_time)
+                    return self._make_request(method, url, params, json_data, timeout, retry_count + 1)
+                logger.error(f"Rate limited (HTTP {status}); retries exhausted")
+                raise LCSCRateLimitError(
+                    "EasyEDA is rate-limiting requests. Wait a few seconds and try again."
+                )
 
             logger.error(f"HTTP error: {e}")
             raise LCSCAPIError(f"API request failed: {e}")
@@ -441,6 +458,10 @@ class LCSCAPIClient:
             logger.info(f"Component complete: {component_data['name']} by {component_data['manufacturer']}, stock={component_data['stock']}")
             return component_data
 
+        except LCSCAPIError:
+            # Already a typed API error (incl. LCSCRateLimitError) — propagate
+            # as-is so callers can distinguish rate-limiting from other failures.
+            raise
         except Exception as e:
             logger.error(f"Search failed for {lcsc_id}: {e}")
             raise LCSCAPIError(f"Search failed: {e}")

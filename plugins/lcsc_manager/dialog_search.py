@@ -10,7 +10,7 @@ import requests
 from typing import Dict, Any, Optional, List
 from pathlib import Path
 
-from .api.lcsc_api import get_api_client, LCSCAPIError
+from .api.lcsc_api import get_api_client, LCSCAPIError, LCSCRateLimitError
 from .library.library_manager import LibraryManager
 from .utils.logger import get_logger
 from .utils.config import get_config
@@ -586,6 +586,7 @@ class LCSCManagerSearchDialog(wx.Dialog):
 
     def _load_previews_async(self, result, thread_id):
         """Load SVG previews and component data independently (runs in background thread)"""
+        lcsc_id = None  # bound before the try so except handlers can reference it
         try:
             lcsc_id = result.get("uuid") or result.get("lcsc", {}).get("number")
             if not lcsc_id:
@@ -650,7 +651,12 @@ class LCSCManagerSearchDialog(wx.Dialog):
 
             specs_text = self._format_specifications(component_data) if component_data else ""
             if not svgs and not component_data:
-                specs_text = f"Component {lcsc_id} not found in EasyEDA database."
+                specs_text = (
+                    f"{lcsc_id} has no symbol/footprint in EasyEDA's library, "
+                    f"so it can't be imported.\n\n"
+                    f"Many JLCPCB catalog parts lack EasyEDA CAD models — pick a "
+                    f"result that shows symbol and footprint previews instead."
+                )
 
             # Cache everything
             self.preview_cache[lcsc_id] = {
@@ -666,6 +672,16 @@ class LCSCManagerSearchDialog(wx.Dialog):
             if thread_id == self.preview_thread_id:
                 wx.CallAfter(self._update_specs, specs_text)
 
+        except LCSCRateLimitError as e:
+            # Transient throttling, not a missing part — tell the user to retry.
+            logger.warning(f"Rate limited loading previews for {lcsc_id}: {e}")
+            if thread_id == self.preview_thread_id:
+                wx.CallAfter(
+                    self._display_previews, None, None,
+                    "EasyEDA is rate-limiting requests right now.\n\n"
+                    "Wait a few seconds, then click the component again.",
+                    placeholder_msg="Rate limited — retry shortly"
+                )
         except Exception as e:
             logger.error(f"Failed to load previews: {e}", exc_info=True)
             error_text = f"Failed to load component information:\n\n{str(e)}"
