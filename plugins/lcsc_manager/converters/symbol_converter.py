@@ -104,49 +104,70 @@ class SymbolConverter:
         kicad_symbol = KicadSymbol()
 
         # Extract shape data from EasyEDA response
-        if "dataStr" not in easyeda_data or "shape" not in easyeda_data["dataStr"]:
+        if "dataStr" not in easyeda_data:
             raise ValueError("No shape data in EasyEDA response")
 
-        symbol_shape = easyeda_data["dataStr"]["shape"]
-        translation = (
-            float(easyeda_data["dataStr"]["head"]["x"]),
-            float(easyeda_data["dataStr"]["head"]["y"])
-        )
-
-        # Add drawing start (unit_demorgan format for KiCad 9.0)
-        kicad_symbol.drawing += f'\n    (symbol "{symbol_name}_1_1"'
-
-        # Parse each shape element using handlers
         if symbol_handlers is None:
             raise ValueError("symbol_handlers not available (missing KicadModTree?)")
 
-        for line in symbol_shape:
-            args = [i for i in line.split("~")]
-            model = args[0]
+        # Multi-unit symbols (e.g. large MCUs split across several gates) deliver
+        # each unit as an entry in "subparts"; the top-level dataStr.shape is empty
+        # in that case. Single-unit symbols carry their geometry directly in the
+        # top-level dataStr.shape and have no subparts. Emit one KiCad sub-symbol
+        # ("{name}_{unit}_1") per unit so every piece imports — previously only the
+        # top-level shape was read, dropping every subpart unit.
+        subparts = easyeda_data.get("subparts") or []
+        units = subparts if subparts else [easyeda_data]
 
-            if model in symbol_handlers.handlers:
-                try:
-                    if model == "P":
-                        # h_P needs the raw line to extract multi-unit pin numbers
-                        # from the ^^-delimited num segment.
-                        symbol_handlers.handlers[model](
-                            data=args[1:],
-                            translation=translation,
-                            kicad_symbol=kicad_symbol,
-                            raw_line=line,
-                        )
-                    else:
-                        symbol_handlers.handlers[model](
-                            data=args[1:],
-                            translation=translation,
-                            kicad_symbol=kicad_symbol,
-                        )
-                except Exception as e:
-                    self.logger.warning(f"Failed to parse shape element {model}: {e}")
-            else:
-                self.logger.debug(f"Unhandled symbol shape type: {model}")
+        # All units share a single canvas origin so their geometry stays aligned
+        # when placed together in a schematic (mirrors easyeda2kicad's shared-origin
+        # handling). EasyEDA stores the same head x/y on the top-level and every
+        # subpart, so the top-level head is the authoritative reference.
+        head = easyeda_data["dataStr"].get("head", {})
+        translation = (float(head.get("x") or 0), float(head.get("y") or 0))
 
-        kicad_symbol.drawing += "\n    )"
+        shape_count = 0
+        for unit_index, unit in enumerate(units, start=1):
+            unit_shape = unit.get("dataStr", {}).get("shape", []) or []
+
+            # Add drawing start (unit_demorgan format for KiCad 9.0)
+            kicad_symbol.drawing += f'\n    (symbol "{symbol_name}_{unit_index}_1"'
+
+            for line in unit_shape:
+                args = [i for i in line.split("~")]
+                model = args[0]
+
+                if model in symbol_handlers.handlers:
+                    shape_count += 1
+                    try:
+                        if model == "P":
+                            # h_P needs the raw line to extract multi-unit pin numbers
+                            # from the ^^-delimited num segment.
+                            symbol_handlers.handlers[model](
+                                data=args[1:],
+                                translation=translation,
+                                kicad_symbol=kicad_symbol,
+                                raw_line=line,
+                            )
+                        else:
+                            symbol_handlers.handlers[model](
+                                data=args[1:],
+                                translation=translation,
+                                kicad_symbol=kicad_symbol,
+                            )
+                    except Exception as e:
+                        self.logger.warning(f"Failed to parse shape element {model}: {e}")
+                else:
+                    self.logger.debug(f"Unhandled symbol shape type: {model}")
+
+            kicad_symbol.drawing += "\n    )"
+
+        # No drawable geometry anywhere -> fall back to the placeholder symbol.
+        if shape_count == 0:
+            raise ValueError("No shape data in EasyEDA response")
+
+        if len(units) > 1:
+            self.logger.info(f"Multi-unit symbol: {len(units)} units")
 
         # Build complete symbol with properties
         lcsc_id = component_info.get("lcsc_id", "")

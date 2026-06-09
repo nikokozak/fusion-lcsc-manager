@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+- **Multi-unit symbols now import every unit.** Parts whose schematic symbol is split across several units/gates (e.g. C3216634 / MIMXRT685SFVKB) imported as an empty symbol. EasyEDA delivers each unit as an entry in `subparts` and leaves the top-level `dataStr.shape` empty, but the symbol converter only read the top-level shape. It now emits one KiCad sub-symbol (`<name>_<unit>_1`) per unit, using the shared canvas origin so units stay aligned. Single-unit parts are unchanged; a part with no drawable geometry anywhere still falls back to the placeholder symbol.
+
+### Added
+- `tests/test_symbol_multi_unit.py` — offline coverage for multi-unit fan-out (one sub-symbol per unit, all pins preserved), single-unit no-regression, and the empty-geometry placeholder fallback.
+
 ## [0.5.1] - 2026-06-01
 
 Resolves [#5](https://github.com/hulryung/kicad-lcsc-manager/issues/5) (3D models not linked to footprints) and addresses [#7](https://github.com/hulryung/kicad-lcsc-manager/issues/7) (macOS install friction and confusing search errors).
