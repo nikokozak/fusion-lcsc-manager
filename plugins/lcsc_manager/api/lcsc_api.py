@@ -102,9 +102,9 @@ class LCSCAPIClient:
 
     CACHE_DIR = Path.home() / ".kicad_lcsc_manager_cache"
 
-    def __init__(self):
+    def __init__(self, config=None):
         """Initialize LCSC API client"""
-        self.config = get_config()
+        self.config = config or get_config()
         self.last_request_time = 0
         self.use_cache = bool(self.config.get("api_cache_enabled", False))
         if self.use_cache:
@@ -332,7 +332,8 @@ class LCSCAPIClient:
                 "stock": stock,
                 "price": prices,
                 "datasheet": component.get("dataManualUrl", ""),
-                "image": component.get("minImageAccessId", ""),
+                "image": component.get("productBigImageAccessId")
+                or component.get("minImageAccessId", ""),
                 "url": component.get("lcscGoodsUrl", f"https://www.lcsc.com/product-detail/{lcsc_id}.html"),
                 # May have better description
                 "jlcpcb_description": component.get("describe", ""),
@@ -453,7 +454,10 @@ class LCSCAPIClient:
                 # Update image if JLCPCB has one
                 if jlcpcb_info.get("image"):
                     image_id = jlcpcb_info["image"]
-                    component_data["image"] = f"https://assets.jlcpcb.com/attachments/{image_id}"
+                    component_data["image"] = (
+                        "https://jlcpcb.com/api/file/downloadByFileSystemAccessId/"
+                        f"{image_id}"
+                    )
 
             logger.info(f"Component complete: {component_data['name']} by {component_data['manufacturer']}, stock={component_data['stock']}")
             return component_data
@@ -768,9 +772,14 @@ class LCSCAPIClient:
             # Convert JLCPCB format to our internal format
             results = []
             for comp in components:
-                # Extract LCSC ID from urlSuffix (e.g., "RaspberryPi-RP2040/C2040" -> "C2040")
+                # Prefer the explicit code; older responses only expose it in the URL suffix.
                 url_suffix = comp.get("urlSuffix", "")
-                lcsc_id = url_suffix.split("/")[-1] if "/" in url_suffix else ""
+                lcsc_id = comp.get("componentCode") or (
+                    url_suffix.split("/")[-1] if "/" in url_suffix else ""
+                )
+                image_id = comp.get("productBigImageAccessId") or comp.get(
+                    "minImageAccessId", ""
+                )
 
                 # Debug: log available name fields for first component
                 if len(results) == 0 and lcsc_id:
@@ -810,6 +819,16 @@ class LCSCAPIClient:
                     "title": name,
                     "package": package_spec,  # Use componentSpecificationEn for package
                     "description": comp.get("describe", ""),
+                    "manufacturer": comp.get("componentBrandEn", ""),
+                    "manufacturer_part": comp.get("componentModelEn", ""),
+                    "datasheet": comp.get("dataManualUrl", ""),
+                    "url": comp.get("lcscGoodsUrl", ""),
+                    "image": (
+                        "https://jlcpcb.com/api/file/downloadByFileSystemAccessId/"
+                        f"{image_id}"
+                        if image_id
+                        else ""
+                    ),
                     "uuid": lcsc_id,  # Use LCSC ID as UUID for fetching later
                     "stockCount": comp.get("stockCount", 0),
                     "componentId": comp.get("componentId"),

@@ -1,0 +1,13 @@
+{
+  "autodeskProduct": "Fusion360",
+  "type": "addin",
+  "id": "f58c88a3-5f2d-4c65-9846-7f14fda2ab27",
+  "author": "nikokozak (Fusion port; original KiCad plugin by hulryung)",
+  "description": {
+    "": "Search LCSC/JLCPCB and generate Fusion Electronics component libraries."
+  },
+  "version": "0.1.0",
+  "runOnStartup": true,
+  "supportedOS": "windows|mac",
+  "editEnabled": true
+}

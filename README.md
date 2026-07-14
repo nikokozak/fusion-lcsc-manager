@@ -1,12 +1,96 @@
-# KiCad LCSC Manager Plugin
+# LCSC Manager for Autodesk Fusion Electronics
 
-A KiCad plugin that allows you to search and import electronic components from LCSC/EasyEDA and JLCPCB directly into your KiCad projects, including symbols, footprints, and 3D models.
+> **Port and attribution:** This repository is an Autodesk Fusion Electronics
+> port of [hulryung/kicad-lcsc-manager](https://github.com/hulryung/kicad-lcsc-manager),
+> the original KiCad LCSC Manager plugin by
+> [hulryung](https://github.com/hulryung). The original author deserves credit
+> for the KiCad plugin and the catalog workflow on which this port is based.
+
+The Fusion port searches LCSC/EasyEDA and JLCPCB, previews product photos,
+symbols, and footprints, generates a Fusion-compatible EAGLE `.lbr`, and
+downloads available STEP models. The original KiCad plugin remains included in
+this fork.
+
+## Install the Fusion add-in
+
+### 1. Get a packaged add-in
+
+If you received `fusion-lcsc-manager-0.1.0.zip` from the repository owner, skip
+to step 2. To build the same self-contained ZIP from this repository, install
+Python 3 and `zip`, then run:
+
+```sh
+git clone https://github.com/nikokozak/kicad-lcsc-manager.git
+cd kicad-lcsc-manager
+./scripts/package-fusion.sh 0.1.0
+```
+
+On Windows, run the command from Git Bash. The package is written to
+`release/fusion-lcsc-manager-0.1.0.zip` and already contains its Python
+dependencies.
+
+### 2. Install it
+
+1. Quit Fusion completely.
+2. Unzip the package. It contains one folder named `LCSCManagerFusion`.
+3. Copy that entire folder into Fusion's add-in directory:
+   - macOS: `~/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/`
+   - Windows: `%AppData%\Autodesk\Autodesk Fusion 360\API\AddIns\`
+4. Start Fusion.
+5. Open **Utilities → Scripts and Add-Ins**, select the **Add-Ins** tab, choose
+   **LCSCManagerFusion**, and click **Run**. The manifest also tells Fusion to
+   start it automatically on future launches.
+6. Open **LCSC Manager** from Fusion's global quick-access toolbar.
+
+The directory name matters. Directly inside `LCSCManagerFusion`, you should see
+`LCSCManagerFusion.py`, `LCSCManagerFusion.manifest`, `index.html`, `lib/`, and
+`lcsc_manager/`—not another nested `LCSCManagerFusion` folder.
+
+If Fusion uses a different add-in directory on your machine, open
+**Utilities → Scripts and Add-Ins**, click the **+** menu, choose
+**Script or add-in from device**, and select the unzipped
+`LCSCManagerFusion` folder. Autodesk documents both approaches in
+[How to install an add-in or script](https://help.autodesk.com/view/fusion360/ENU/?caas=caas%2Fsfdcarticles%2Fsfdcarticles%2FHow-to-install-an-ADD-IN-and-Script-in-Fusion-360.html).
+
+### 3. Test an import
+
+1. Search for an LCSC number such as `C2040` and select a result.
+2. Confirm that its product photo, symbol, and footprint previews load.
+3. Keep the default destination or choose another path ending in `.lbr`, then
+   click **Import selected**.
+4. In a Fusion Electronics design, open **Library Manager → Private
+   Libraries → Import/restore Libraries**, select the generated `.lbr`, and
+   activate it.
+
+The default output is
+`~/Documents/Fusion 360/LCSC/lcsc_imported.lbr`. When a model is available, its
+STEP file is saved beside it under `lcsc_imported.3dmodels/` and must currently
+be attached in Fusion's package editor. See [FUSION.md](FUSION.md) for usage,
+development setup, current limitations, and safety checks before fabrication.
+
+### Troubleshooting
+
+- **No toolbar button:** In **Scripts and Add-Ins**, stop and run the add-in
+  again. If it is not listed, use **+ → Script or add-in from device**.
+- **An old or broken UI remains:** Quit Fusion, delete the existing
+  `LCSCManagerFusion` add-in folder, copy in a fresh package, and restart.
+- **The add-in reports a Python import error:** Make sure you installed the
+  packaged ZIP, including its `lib/` directory, rather than only copying the
+  development source folder.
+- **A specific part has no CAD data:** Some LCSC listings do not have EasyEDA
+  symbol or footprint data. Try a known part such as `C2040` to distinguish a
+  listing limitation from an installation problem.
+
+## Original KiCad plugin
+
+The upstream plugin searches and imports LCSC/EasyEDA and JLCPCB components
+directly into KiCad projects, including symbols, footprints, and 3D models.
 
 > **🚀 v0.5.0 — Footprint pipeline switched to upstream (2026-05-11)**: The footprint converter is now backed by a vendored copy of [easyeda2kicad.py v1.0.1](https://github.com/uPesy/easyeda2kicad.py) (see `plugins/lcsc_manager/vendor/easyeda2kicad/`), eliminating the `KicadModTree` runtime dependency. Footprints that previously fell back to a 2-pad placeholder on installs without `KicadModTree` now convert correctly. See [CHANGELOG.md](CHANGELOG.md) and [NOTICE.md](NOTICE.md) for licensing.
 >
 > **v0.4.0** added a Settings dialog and per-project / global library-path overrides — see the "Customizing library paths" section below.
 
-## ✨ Features
+## ✨ KiCad features
 
 ### Advanced Component Search
 - 🔍 **Multi-parameter search**: Search by component name, value, package type, and manufacturer
@@ -25,7 +109,7 @@ A KiCad plugin that allows you to search and import electronic components from L
 - 🎨 Seamless integration with KiCad 9.0+
 - 🔄 Support for both LCSC/EasyEDA and JLCPCB parts
 
-## 📥 Installation
+## 📥 KiCad installation
 
 > **Note about KiCad PCM**: This plugin is **not available in the official KiCad Plugin and Content Manager** due to KiCad's commercial services policy. Plugins that directly integrate with commercial APIs (like LCSC/JLCPCB) require a formal contract between the service provider and the KiCad team. As a third-party developer, I cannot submit to the official PCM. However, you can install it through the methods below.
 
@@ -225,7 +309,7 @@ Alternatively, manually remove:
 
 ```bash
 # Clone the repository
-git clone https://github.com/hulryung/kicad-lcsc-manager.git
+git clone https://github.com/nikokozak/kicad-lcsc-manager.git
 cd kicad-lcsc-manager
 
 # Install dependencies
@@ -253,7 +337,7 @@ kicad-lcsc-manager/
 
 ## Related Projects
 
-Check out my other KiCad and LCSC-related tools:
+Other KiCad and LCSC-related tools by the original plugin author:
 
 ### 🌐 [EasyEDA2KiCad Web](https://github.com/hulryung/easyeda2kicad-web)
 A web-based tool to convert EasyEDA/LCSC components to KiCad format with real-time 2D and 3D visualization. Perfect for previewing components before importing them into your project.
@@ -355,4 +439,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 💬 Support
 
-If you encounter any issues or have questions, please [open an issue](https://github.com/hulryung/kicad-lcsc-manager/issues) on GitHub.
+For problems with the Fusion port, please
+[open an issue in this fork](https://github.com/nikokozak/kicad-lcsc-manager/issues).
+For the original KiCad plugin, use the
+[upstream issue tracker](https://github.com/hulryung/kicad-lcsc-manager/issues).

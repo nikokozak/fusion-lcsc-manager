@@ -12,6 +12,7 @@ next level. A project override is loaded explicitly via
 load_project_overrides() once the project path is known.
 """
 import json
+import os
 from pathlib import Path
 from typing import Any, Dict, Optional, cast
 from .logger import get_logger
@@ -44,7 +45,10 @@ class Config:
 
     def __init__(self, config_path: Optional[Path] = None):
         if config_path is None:
-            config_dir = Path.home() / ".kicad" / "lcsc_manager"
+            config_dir = Path(os.environ.get(
+                "LCSC_MANAGER_HOME",
+                str(Path.home() / ".kicad" / "lcsc_manager"),
+            ))
             config_dir.mkdir(parents=True, exist_ok=True)
             config_path = config_dir / "config.json"
 

@@ -24,15 +24,6 @@ def setup_logger(name: str = "lcsc_manager") -> logging.Logger:
 
     logger.setLevel(logging.DEBUG)
 
-    # Create logs directory in user's home
-    log_dir = Path.home() / ".kicad" / "lcsc_manager" / "logs"
-    log_dir.mkdir(parents=True, exist_ok=True)
-
-    # File handler
-    log_file = log_dir / "lcsc_manager.log"
-    file_handler = logging.FileHandler(log_file)
-    file_handler.setLevel(logging.DEBUG)
-
     # Console handler
     console_handler = logging.StreamHandler()
     console_handler.setLevel(logging.INFO)
@@ -42,10 +33,23 @@ def setup_logger(name: str = "lcsc_manager") -> logging.Logger:
         '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
-    file_handler.setFormatter(formatter)
     console_handler.setFormatter(formatter)
 
-    logger.addHandler(file_handler)
+    # Fusion sets LCSC_MANAGER_HOME so it does not write KiCad state. If the
+    # host sandboxes home-directory writes, console logging still works.
+    data_dir = Path(os.environ.get(
+        "LCSC_MANAGER_HOME",
+        str(Path.home() / ".kicad" / "lcsc_manager"),
+    ))
+    try:
+        log_dir = data_dir / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        file_handler = logging.FileHandler(log_dir / "lcsc_manager.log")
+        file_handler.setLevel(logging.DEBUG)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+    except OSError:
+        pass
     logger.addHandler(console_handler)
 
     return logger

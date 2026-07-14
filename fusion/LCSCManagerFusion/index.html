@@ -1,0 +1,318 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LCSC Manager</title>
+  <style>
+    :root { color-scheme: light dark; font: 13px -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+    * { box-sizing: border-box; }
+    html, body { min-height: 100%; }
+    body { margin: 0; overflow-y: auto; color: CanvasText; background: Canvas; }
+    main { display: flex; flex-direction: column; gap: 12px; min-height: 100vh; padding: 14px; }
+    .search { display: grid; grid-template-columns: minmax(180px, 1fr) minmax(120px, .45fr) auto; gap: 8px; }
+    input:not([type="checkbox"]), button { min-height: 34px; border: 1px solid color-mix(in srgb, CanvasText 25%, transparent); border-radius: 5px; padding: 7px 10px; font: inherit; }
+    input:not([type="checkbox"]) { width: 100%; color: CanvasText; background: Canvas; }
+    button { cursor: pointer; color: ButtonText; background: ButtonFace; }
+    button.primary { color: white; border-color: #0672ce; background: #0672ce; }
+    button:disabled { cursor: wait; opacity: .55; }
+    .panel { min-height: 0; overflow-x: auto; border: 1px solid color-mix(in srgb, CanvasText 18%, transparent); border-radius: 7px; background: color-mix(in srgb, Canvas 96%, CanvasText); }
+    .results-panel { max-height: 280px; overflow: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th { position: sticky; top: 0; z-index: 1; text-align: left; background: color-mix(in srgb, Canvas 88%, CanvasText); }
+    th, td { padding: 7px 9px; border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent); white-space: nowrap; }
+    tbody tr { cursor: pointer; }
+    tbody tr:hover, tbody tr.selected { background: color-mix(in srgb, Highlight 18%, Canvas); }
+    .details { display: grid; grid-template-columns: repeat(3, minmax(220px, 1fr)); gap: 10px; align-items: start; }
+    .preview { min-height: 0; }
+    h2 { margin: 0; padding: 9px 11px; font-size: 13px; border-bottom: 1px solid color-mix(in srgb, CanvasText 12%, transparent); }
+    .preview-body { display: grid; place-items: center; min-height: 240px; padding: 10px; }
+    .preview img { display: block; width: 100%; height: auto; object-fit: contain; }
+    .product img { max-height: 360px; }
+    .placeholder { display: grid; place-items: center; min-height: 220px; color: color-mix(in srgb, CanvasText 55%, transparent); }
+    [hidden] { display: none !important; }
+    .specs { margin: 0; padding: 10px 12px; list-style: none; line-height: 1.5; }
+    .specs strong { display: inline-block; min-width: 92px; }
+    .import { display: grid; grid-template-columns: auto auto auto minmax(220px, 1fr) auto; align-items: center; gap: 12px; }
+    label { display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+    input[type="checkbox"] { width: 16px; height: 16px; margin: 0; accent-color: #0672ce; }
+    .status { min-height: 18px; grid-column: 1 / -1; color: color-mix(in srgb, CanvasText 70%, transparent); }
+    .status.error { color: #c62828; }
+    .note { grid-column: 1 / -1; margin: 0; font-size: 12px; color: color-mix(in srgb, CanvasText 68%, transparent); }
+    .spec-panel { grid-column: 1 / -1; }
+    @media (max-width: 800px) { .details { grid-template-columns: 1fr 1fr; } }
+    @media (max-width: 560px) { .search, .details, .import { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+<main>
+  <section class="search" aria-label="Component search">
+    <input id="query" aria-label="Search" placeholder="Part number, name, or value (for example RP2040 or 10uF)">
+    <input id="package" aria-label="Package filter" placeholder="Package (optional)">
+    <button id="search" class="primary">Search</button>
+  </section>
+
+  <section class="panel results-panel" aria-label="Search results">
+    <table>
+      <thead><tr><th>LCSC</th><th>Name</th><th>Package</th><th>Price</th><th>Stock</th><th>Type</th></tr></thead>
+      <tbody id="results"><tr><td colspan="6">Search LCSC/JLCPCB to begin.</td></tr></tbody>
+    </table>
+  </section>
+
+  <section class="details">
+    <article class="panel preview"><h2>Symbol</h2><div class="preview-body"><span class="placeholder">No symbol selected</span><img id="symbol" alt="Symbol preview" hidden></div></article>
+    <article class="panel preview"><h2>Footprint</h2><div class="preview-body"><span class="placeholder">No footprint selected</span><img id="footprint" alt="Footprint preview" hidden></div></article>
+    <article class="panel preview product"><h2>Product</h2><div class="preview-body"><span class="placeholder">No product image selected</span><img id="product" alt="LCSC product" referrerpolicy="no-referrer" hidden></div></article>
+    <article class="panel spec-panel"><h2>Component</h2><ul id="specs" class="specs"><li>Select a result to inspect it.</li></ul></article>
+  </section>
+
+  <section class="import">
+    <label><input id="with-symbol" type="checkbox" checked> Symbol</label>
+    <label><input id="with-footprint" type="checkbox" checked> Footprint</label>
+    <label><input id="with-3d" type="checkbox" checked> Fusion STEP</label>
+    <input id="output" aria-label="Fusion library output path" placeholder="Path to .lbr file">
+    <button id="import" class="primary" disabled>Import selected</button>
+    <p id="note" class="note"></p>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+  </section>
+</main>
+
+<script>
+  const $ = id => document.getElementById(id);
+  let selected = null;
+  let requestCounter = 0;
+  const pendingRequests = new Map();
+
+  function sendToFusion(action, data) {
+    if (window.adsk && typeof window.adsk.fusionSendData === 'function') {
+      return window.adsk.fusionSendData(action, data);
+    }
+    if (window.neutronJavaScriptObject && typeof window.neutronJavaScriptObject.executeQuery === 'function') {
+      return new Promise((resolve, reject) => {
+        try {
+          window.neutronJavaScriptObject.executeQuery(action, data, resolve);
+        } catch (error) {
+          reject(error);
+        }
+      });
+    }
+    return null;
+  }
+
+  async function call(action, data = {}) {
+    const requestId = `${Date.now()}-${requestCounter += 1}`;
+    const result = new Promise((resolve, reject) => pendingRequests.set(requestId, {resolve, reject}));
+    const payload = JSON.stringify({...data, request_id: requestId});
+    try {
+      let request = sendToFusion(action, payload);
+      for (let attempt = 0; request === null && attempt < 40; attempt += 1) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+        request = sendToFusion(action, payload);
+      }
+      if (request === null) throw new Error('Fusion browser bridge did not load. Close and reopen the LCSC Manager palette.');
+      const response = JSON.parse(await request);
+      if (!response.ok) throw new Error(response.error || 'Request failed');
+      if (response.pending) return await result;
+      pendingRequests.delete(requestId);
+      return response;
+    } catch (error) {
+      pendingRequests.delete(requestId);
+      throw error;
+    }
+  }
+
+  window.fusionJavaScriptHandler = {handle(action, data) {
+    try {
+      if (action !== 'response') return `Unexpected action: ${action}`;
+      const message = JSON.parse(data);
+      const pending = pendingRequests.get(message.request_id);
+      if (!pending) return 'IGNORED';
+      pendingRequests.delete(message.request_id);
+      if (message.response.ok) pending.resolve(message.response);
+      else pending.reject(new Error(message.response.error || 'Request failed'));
+      return 'OK';
+    } catch (error) {
+      console.error(error);
+      return 'FAILED';
+    }
+  }};
+
+  function busy(value, message = '') {
+    $('search').disabled = value;
+    $('import').disabled = value || !selected;
+    if (message) setStatus(message);
+  }
+
+  function setStatus(message, error = false) {
+    $('status').textContent = message;
+    $('status').classList.toggle('error', error);
+  }
+
+  function svgImage(element, svg) {
+    element.removeAttribute('src');
+    element.hidden = !svg;
+    const placeholder = element.previousElementSibling;
+    placeholder.hidden = Boolean(svg);
+    if (!svg) {
+      placeholder.textContent = 'Preview unavailable';
+      return;
+    }
+    const bytes = new TextEncoder().encode(svg);
+    let binary = '';
+    bytes.forEach(byte => binary += String.fromCharCode(byte));
+    element.src = `data:image/svg+xml;base64,${btoa(binary)}`;
+  }
+
+  function productImage(element, image) {
+    const placeholder = element.previousElementSibling;
+    if (element.dataset.objectUrl) URL.revokeObjectURL(element.dataset.objectUrl);
+    delete element.dataset.objectUrl;
+    element.removeAttribute('src');
+    element.hidden = true;
+    placeholder.hidden = false;
+    placeholder.textContent = image ? 'Loading product image…' : 'Product image unavailable';
+    if (!image) return;
+    const bytes = new Uint8Array(image.hex.length / 2);
+    for (let index = 0; index < bytes.length; index += 1) {
+      bytes[index] = parseInt(image.hex.slice(index * 2, index * 2 + 2), 16);
+    }
+    const url = URL.createObjectURL(new Blob([bytes], {type: image.mime}));
+    element.dataset.objectUrl = url;
+    element.onload = () => {
+      placeholder.hidden = true;
+      element.hidden = false;
+    };
+    element.onerror = () => {
+      URL.revokeObjectURL(url);
+      delete element.dataset.objectUrl;
+      element.hidden = true;
+      placeholder.hidden = false;
+      placeholder.textContent = 'Product image unavailable';
+    };
+    element.src = url;
+  }
+
+  function addCell(row, value) {
+    const cell = row.insertCell();
+    cell.textContent = value ?? '';
+  }
+
+  function renderResults(results) {
+    const body = $('results');
+    body.replaceChildren();
+    if (!results.length) {
+      const row = body.insertRow();
+      const cell = row.insertCell();
+      cell.colSpan = 6;
+      cell.textContent = 'No components found.';
+      return;
+    }
+    results.forEach(item => {
+      const row = body.insertRow();
+      row.tabIndex = 0;
+      addCell(row, item.lcsc_id);
+      addCell(row, item.name);
+      addCell(row, item.package);
+      addCell(row, item.price ? `$${Number(item.price).toFixed(4)}` : '—');
+      addCell(row, Number(item.stock || 0).toLocaleString());
+      addCell(row, item.library_type);
+      const choose = () => selectResult(item, row);
+      row.addEventListener('click', choose);
+      row.addEventListener('keydown', event => { if (event.key === 'Enter') choose(); });
+    });
+  }
+
+  async function search() {
+    const query = $('query').value.trim();
+    if (!query) return setStatus('Enter a search term.', true);
+    busy(true, 'Searching…');
+    try {
+      const response = await call('search', {query, package: $('package').value.trim()});
+      selected = null;
+      $('import').disabled = true;
+      renderResults(response.results);
+      setStatus(`${response.results.length} result${response.results.length === 1 ? '' : 's'}.`);
+    } catch (error) {
+      setStatus(error.message, true);
+    } finally {
+      busy(false);
+    }
+  }
+
+  async function selectResult(item, row) {
+    selected = item;
+    document.querySelectorAll('#results tr').forEach(node => node.classList.remove('selected'));
+    row.classList.add('selected');
+    busy(true, `Loading ${item.lcsc_id}…`);
+    try {
+      const response = await call('preview', {lcsc_id: item.lcsc_id, component: item});
+      if (selected !== item) return;
+      svgImage($('symbol'), response.symbol_svg);
+      svgImage($('footprint'), response.footprint_svg);
+      const component = response.component;
+      productImage($('product'), component.image);
+      const prices = (component.price || []).map(tier => {
+        const quantity = tier.qty_max ? `${tier.qty}-${tier.qty_max}` : `${tier.qty}+`;
+        return `${quantity}: $${Number(tier.price).toFixed(4)}`;
+      }).join(' · ');
+      const fields = [
+        ['LCSC', component.lcsc_id], ['Name', component.name],
+        ['Manufacturer', component.manufacturer], ['MPN', component.manufacturer_part],
+        ['Package', component.package], ['Stock', Number(component.stock || 0).toLocaleString()],
+        ['Class', component.jlcpcb_class], ['Mounting', component.mounting],
+        ['Pricing', prices], ['Description', component.description],
+        ['Datasheet', component.datasheet]
+      ];
+      const specs = $('specs');
+      specs.replaceChildren(...fields.filter(([, value]) => value).map(([label, value]) => {
+        const li = document.createElement('li');
+        const strong = document.createElement('strong');
+        strong.textContent = `${label}:`;
+        li.append(strong, document.createTextNode(String(value)));
+        return li;
+      }));
+      setStatus(`${item.lcsc_id} is ready to import.`);
+    } catch (error) {
+      if (selected === item) setStatus(error.message, true);
+    } finally {
+      if (selected === item) busy(false);
+    }
+  }
+
+  async function importSelected() {
+    if (!selected) return;
+    const options = {
+      lcsc_id: selected.lcsc_id,
+      output: $('output').value.trim(),
+      symbol: $('with-symbol').checked,
+      footprint: $('with-footprint').checked,
+      model_3d: $('with-3d').checked
+    };
+    if (!options.symbol && !options.footprint && !options.model_3d) return setStatus('Select at least one import option.', true);
+    busy(true, `Importing ${selected.lcsc_id}…`);
+    try {
+      const {result} = await call('import', options);
+      const files = [result.library, result.step].filter(Boolean).join(' · ');
+      setStatus(`${result.updated ? 'Updated' : 'Imported'} ${selected.lcsc_id}: ${files}`);
+      if (result.notifications.length) $('note').textContent = result.notifications.join(' ');
+    } catch (error) {
+      setStatus(error.message, true);
+    } finally {
+      busy(false);
+    }
+  }
+
+  $('search').addEventListener('click', search);
+  $('query').addEventListener('keydown', event => { if (event.key === 'Enter') search(); });
+  $('package').addEventListener('keydown', event => { if (event.key === 'Enter') search(); });
+  $('import').addEventListener('click', importSelected);
+
+  window.addEventListener('load', () => {
+    call('init').then(response => {
+      $('output').value = response.output;
+      $('note').textContent = response.limitation;
+    }).catch(error => setStatus(error.message, true));
+  });
+</script>
+</body>
+</html>
