@@ -13,43 +13,28 @@ this fork.
 
 ## Install the Fusion add-in
 
-### 1. Get a packaged add-in
-
-If you received `fusion-lcsc-manager-0.1.0.zip` from the repository owner, skip
-to step 2. To build the same self-contained ZIP from this repository, install
-Python 3 and `zip`, then run:
+### 1. Clone the repository
 
 ```sh
 git clone https://github.com/nikokozak/fusion-lcsc-manager.git
 cd fusion-lcsc-manager
-./scripts/package-fusion.sh 0.1.0
+python3 -m pip install --target fusion/LCSCManagerFusion/lib requests
 ```
 
-On Windows, run the command from Git Bash. The package is written to
-`release/fusion-lcsc-manager-0.1.0.zip` and already contains its Python
-dependencies.
+On Windows, use `py -3` instead of `python3`. Keep the cloned repository in a
+permanent location; Fusion will link to it directly.
 
-### 2. Install it
+### 2. Link it in Fusion
 
-1. Quit Fusion completely.
-2. Unzip the package. It contains one folder named `LCSCManagerFusion`.
-3. Copy that entire folder into Fusion's add-in directory:
-   - macOS: `~/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/`
-   - Windows: `%AppData%\Autodesk\Autodesk Fusion 360\API\AddIns\`
-4. Start Fusion.
-5. Open **Utilities → Scripts and Add-Ins**, select the **Add-Ins** tab, choose
-   **LCSCManagerFusion**, and click **Run**. The manifest also tells Fusion to
-   start it automatically on future launches.
+1. Start Fusion and open **Utilities → Scripts and Add-Ins**.
+2. Select the **Add-Ins** tab.
+3. Click the **+** menu and choose **Script or add-in from device**.
+4. Select `fusion/LCSCManagerFusion` inside the cloned repository.
+5. Select **LCSCManagerFusion** in the list and click **Run**.
 6. Open **LCSC Manager** from Fusion's global quick-access toolbar.
 
-The directory name matters. Directly inside `LCSCManagerFusion`, you should see
-`LCSCManagerFusion.py`, `LCSCManagerFusion.manifest`, `index.html`, `lib/`, and
-`lcsc_manager/`—not another nested `LCSCManagerFusion` folder.
-
-If Fusion uses a different add-in directory on your machine, open
-**Utilities → Scripts and Add-Ins**, click the **+** menu, choose
-**Script or add-in from device**, and select the unzipped
-`LCSCManagerFusion` folder. Autodesk documents both approaches in
+Fusion remembers the linked folder and starts the add-in automatically on
+future launches. Autodesk documents this workflow in
 [How to install an add-in or script](https://help.autodesk.com/view/fusion360/ENU/?caas=caas%2Fsfdcarticles%2Fsfdcarticles%2FHow-to-install-an-ADD-IN-and-Script-in-Fusion-360.html).
 
 ### 3. Test an import
@@ -72,11 +57,10 @@ development setup, current limitations, and safety checks before fabrication.
 
 - **No toolbar button:** In **Scripts and Add-Ins**, stop and run the add-in
   again. If it is not listed, use **+ → Script or add-in from device**.
-- **An old or broken UI remains:** Quit Fusion, delete the existing
-  `LCSCManagerFusion` add-in folder, copy in a fresh package, and restart.
-- **The add-in reports a Python import error:** Make sure you installed the
-  packaged ZIP, including its `lib/` directory, rather than only copying the
-  development source folder.
+- **An old or broken UI remains:** Stop the add-in, run `git pull` in the cloned
+  repository, then restart Fusion and run the add-in again.
+- **The add-in reports a Python import error:** Run the `pip install --target`
+  command from step 1 again.
 - **A specific part has no CAD data:** Some LCSC listings do not have EasyEDA
   symbol or footprint data. Try a known part such as `C2040` to distinguish a
   listing limitation from an installation problem.

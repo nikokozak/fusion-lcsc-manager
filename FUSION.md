@@ -18,25 +18,23 @@ The generated library is an EAGLE 9.6.2-compatible `.lbr`, which Fusion Electron
 
 ## Install
 
-Build the self-contained add-in:
+Clone the repository and install the add-in's Python dependency into its local
+`lib` folder:
 
 ```sh
-./scripts/package-fusion.sh 0.1.0
+git clone https://github.com/nikokozak/fusion-lcsc-manager.git
+cd fusion-lcsc-manager
+python3 -m pip install --target fusion/LCSCManagerFusion/lib requests
 ```
 
-Unzip `release/fusion-lcsc-manager-0.1.0.zip` and copy its
-`LCSCManagerFusion` folder into Fusion's add-in directory:
+On Windows, use `py -3` instead of `python3`.
 
-- macOS: `~/Library/Application Support/Autodesk/Autodesk Fusion 360/API/AddIns/`
-- Windows: `%AppData%\Autodesk\Autodesk Fusion 360\API\AddIns\`
-
-Restart Fusion; the add-in loads at startup and places **LCSC Manager** in the global quick-access toolbar. If the button does not appear, open **Utilities → Scripts and Add-Ins**, select **LCSCManagerFusion**, and click **Run**.
-
-If your Fusion installation uses a different add-in directory, use the **+**
-menu in **Scripts and Add-Ins**, choose **Script or add-in from device**, and
-select the unzipped `LCSCManagerFusion` folder.
-
-For development, use the green **+** button in **Scripts and Add-Ins** and select `fusion/LCSCManagerFusion` from this repository. Install `requirements.txt` in `.venv` first; the add-in detects that environment when linked from the repository.
+In Fusion, open **Utilities → Scripts and Add-Ins**, select the **Add-Ins** tab,
+then choose **+ → Script or add-in from device** and select
+`fusion/LCSCManagerFusion` from the cloned repository. Select
+**LCSCManagerFusion**, click **Run**, and open it from Fusion's global
+quick-access toolbar. Fusion remembers the linked folder and starts the add-in
+automatically on future launches.
 
 ## Use
 
