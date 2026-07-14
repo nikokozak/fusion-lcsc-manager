@@ -20,8 +20,8 @@ to step 2. To build the same self-contained ZIP from this repository, install
 Python 3 and `zip`, then run:
 
 ```sh
-git clone https://github.com/nikokozak/kicad-lcsc-manager.git
-cd kicad-lcsc-manager
+git clone https://github.com/nikokozak/fusion-lcsc-manager.git
+cd fusion-lcsc-manager
 ./scripts/package-fusion.sh 0.1.0
 ```
 
@@ -309,8 +309,8 @@ Alternatively, manually remove:
 
 ```bash
 # Clone the repository
-git clone https://github.com/nikokozak/kicad-lcsc-manager.git
-cd kicad-lcsc-manager
+git clone https://github.com/nikokozak/fusion-lcsc-manager.git
+cd fusion-lcsc-manager
 
 # Install dependencies
 pip install -r requirements.txt
@@ -440,6 +440,6 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## 💬 Support
 
 For problems with the Fusion port, please
-[open an issue in this fork](https://github.com/nikokozak/kicad-lcsc-manager/issues).
+[open an issue in this fork](https://github.com/nikokozak/fusion-lcsc-manager/issues).
 For the original KiCad plugin, use the
 [upstream issue tracker](https://github.com/hulryung/kicad-lcsc-manager/issues).
